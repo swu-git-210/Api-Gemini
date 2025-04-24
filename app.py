@@ -22,12 +22,18 @@ app = Flask(__name__)
 
 # ฟังก์ชันหลักในการใช้ Gemini API
 def generate_answer(question):
-    prompt = f"คุณคือผู้ให้คำแนะนำ เกี่ยวกับเพลง โดยค้นหาและแนะนำเพลง พร้อมลิ้งyoutubeด้วย ได้ทั้งไทยและสากล {question}"
+    prompt = (
+        f"แนะนำเพลง 3 เพลง ที่เหมาะกับคำว่า: '{question}' "
+        f"ให้ตอบกลับเป็น format ต่อไปนี้เท่านั้น (ห้ามเขียนอย่างอื่น):\n\n"
+        f"เพลง: <ชื่อเพลง>\nเหตุผล: <สั้นๆ 1-2 บรรทัด>\nลิงก์: <ลิงก์ YouTube>\n\n"
+        f"ทำแบบนี้ 3 ชุด ห้ามตอบเกิน และห้ามใส่ prefix หรือข้อความอื่นนอกจาก format นี้"
+    )
     response = client.models.generate_content(
         model="gemini-2.0-flash",
         contents=[prompt]
     )
     return response.text
+
 
 # ฟังก์ชันแปลงข้อมูลจาก Gemini ให้เป็นรายการเพลง
 def parse_gemini_response(text):
