@@ -14,7 +14,8 @@ CHANNEL_ACCESS_TOKEN = 'Oz6x3Zse8dmKO5HWmiRy3aCa26v1aiRJWAFIcGXp/kvSE58NBWARFg1A
 CHANNEL_SECRET = 'c9810af033f3b71c3575127651aa3045'
 
 # สร้าง client สำหรับเชื่อมต่อกับ Gemini API
-client = genai.Client(api_key="AIzaSyDo2U64Wt4Kwcq7ei1U1TjeTkmmVaaYz1I")
+genai.configure(api_key="AIzaSyDo2U64Wt4Kwcq7ei1U1TjeTkmmVaaYz1I")
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 # สร้าง LineBotApi และ WebhookHandler
 line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
@@ -31,31 +32,29 @@ def generate_answer(question):
         f"เพลง: <ชื่อเพลง>\nเหตุผล: <สั้นๆ 1-2 บรรทัด>\nลิงก์: <ลิงก์ YouTube>\n\n"
         f"ทำแบบนี้ 3 ชุด ห้ามตอบเกิน และห้ามใส่ prefix หรือข้อความอื่นนอกจาก format นี้"
     )
-    response = client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=[prompt]
-    )
-    return response.text
+    response = model.generate_content(prompt)
+    return response.text if hasattr(response, "text") else response.candidates[0].content.parts[0].text
 
 # แปลงลิงก์ให้เป็นแบบ youtu.be (เปิดผ่านแอปได้ง่ายกว่า)
 def convert_to_short_youtube_url(url):
     match = re.search(r"v=([a-zA-Z0-9_-]+)", url)
     if match:
-        video_id = match.group(1)
-        return f"https://youtu.be/{video_id}"
-    return url  # ถ้าไม่ใช่ลิงก์ YouTube ปกติ ให้คืนค่าตามเดิม
-# ฟังก์ชันแปลงข้อความจาก Gemini ให้เป็นรายการเพลง
+        return f"https://youtu.be/{match.group(1)}"
+    return url
 
+# ฟังก์ชันแปลงข้อความจาก Gemini ให้เป็นรายการเพลง
 def parse_gemini_response(text):
     songs = []
     for block in text.strip().split("\n\n"):
-        lines = block.strip().split("\n")
-        if len(lines) >= 3:
+        try:
+            lines = block.strip().split("\n")
             title = lines[0].split("เพลง:")[1].strip()
             desc = lines[1].split("เหตุผล:")[1].strip()
             raw_url = lines[2].split("ลิงก์:")[1].strip()
             url = convert_to_short_youtube_url(raw_url)
             songs.append({"title": title, "desc": desc, "url": url})
+        except Exception:
+            continue  # ข้ามถ้า format ผิด
     return songs
 
 # ฟังก์ชันสร้าง Bubble
@@ -106,8 +105,9 @@ def build_song_bubble(song):
 # ฟังก์ชันสร้าง Carousel Message
 def create_carousel_message(answer_text):
     song_list = parse_gemini_response(answer_text)
+    if not song_list:
+        return TextSendMessage(text="ขออภัย ไม่พบเพลงจากผลลัพธ์ ลองพิมพ์ใหม่อีกครั้งครับ 🥲")
     bubbles = [build_song_bubble(song) for song in song_list]
-
     return FlexSendMessage(
         alt_text="แนะนำเพลง",
         contents={
@@ -120,9 +120,6 @@ def create_carousel_message(answer_text):
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     user_message = event.message.text.lower()
-    user_id = event.source.user_id
-
-    print(f"Received message: {user_message} from {user_id}")
 
     # คำทักทายเบื้องต้น
     greetings = ['สวัสดี', 'hello', 'hi', 'หวัดดี', 'เฮลโหล', 'ไง']
@@ -149,25 +146,21 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
-    # ถ้าไม่ใช่คำทักทาย → ประมวลผลเป็นคำขอแนะนำเพลง
+    # ประมวลผลคำขอแนะนำเพลง
     answer = generate_answer(user_message)
-    print("Gemini raw response:\n", answer)
-
     flex_msg = create_carousel_message(answer)
     line_bot_api.reply_message(event.reply_token, flex_msg)
 
 # Webhook
 @app.route("/callback", methods=['POST'])
 def callback():
-    signature = request.headers['X-Line-Signature']
+    signature = request.headers.get('X-Line-Signature')
     body = request.get_data(as_text=True)
-
     try:
         handler.handle(body, signature)
     except Exception as e:
         print("Error:", e)
         abort(400)
-
     return 'OK'
 
 if __name__ == "__main__":
