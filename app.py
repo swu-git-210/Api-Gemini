@@ -5,6 +5,8 @@ from linebot.models import (
     FlexSendMessage
 )
 from flask import Flask, request, abort
+from datetime import datetime
+import random
 
 # LINE API Access Token และ Channel Secret
 CHANNEL_ACCESS_TOKEN = 'Oz6x3Zse8dmKO5HWmiRy3aCa26v1aiRJWAFIcGXp/kvSE58NBWARFg1AUf0beFKgqj/+KavL0VJU6wtGOwc3Zf0UfgnAOLJnEBmUwExf6rbCBPz2wplzFtOUVDxo8HJ7RM7En2r4qYg9eBnQeeeWvQdB04t89/1O/w1cDnyilFU='
@@ -34,10 +36,8 @@ def generate_answer(question):
     )
     return response.text
 
-
-# ฟังก์ชันแปลงข้อมูลจาก Gemini ให้เป็นรายการเพลง
+# ฟังก์ชันแปลงข้อความจาก Gemini ให้เป็นรายการเพลง
 def parse_gemini_response(text):
-    """ แปลงข้อความจาก Gemini เป็นรายการเพลงแบบ dict """
     songs = []
     for block in text.strip().split("\n\n"):
         lines = block.strip().split("\n")
@@ -48,7 +48,7 @@ def parse_gemini_response(text):
             songs.append({"title": title, "desc": desc, "url": url})
     return songs
 
-# ฟังก์ชันสร้าง Bubble สำหรับแต่ละเพลง
+# ฟังก์ชันสร้าง Bubble
 def build_song_bubble(song):
     return {
         "type": "bubble",
@@ -64,7 +64,7 @@ def build_song_bubble(song):
                     "weight": "bold",
                     "size": "lg",
                     "wrap": True,
-                    "color": "#1DB954"  # สีเขียวสไตล์ Spotify
+                    "color": "#1DB954"
                 },
                 {
                     "type": "text",
@@ -109,21 +109,44 @@ def create_carousel_message(answer_text):
 # ฟังก์ชันจัดการข้อความที่ได้รับจากผู้ใช้
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    user_message = event.message.text
+    user_message = event.message.text.lower()
     user_id = event.source.user_id
 
     print(f"Received message: {user_message} from {user_id}")
 
-    # ส่งข้อความไปยัง Gemini เพื่อขอคำตอบ
+    # คำทักทายเบื้องต้น
+    greetings = ['สวัสดี', 'hello', 'hi', 'หวัดดี', 'เฮลโหล', 'ไง']
+    if any(greet in user_message for greet in greetings):
+        hour = datetime.now().hour
+        if 5 <= hour < 12:
+            time_greeting = "สวัสดีตอนเช้าครับ ☀️"
+        elif 12 <= hour < 17:
+            time_greeting = "สวัสดีตอนบ่ายครับ 🌤"
+        elif 17 <= hour < 21:
+            time_greeting = "สวัสดีตอนเย็นครับ 🌇"
+        else:
+            time_greeting = "สวัสดีตอนกลางคืนครับ 🌙"
+
+        intro_options = [
+            "ผมคือบอทแนะนำเพลง 🎧",
+            "ผมช่วยเลือกเพลงให้เหมาะกับอารมณ์ของคุณได้ครับ 🎶",
+            "พิมพ์ความรู้สึกของคุณมา แล้วผมจะหาเพลงให้เองครับ 😊",
+            "อยากฟังเพลงแนวไหน บอกผมมาได้เลยครับ 🎼"
+        ]
+        intro = random.choice(intro_options)
+
+        reply_text = f"{time_greeting}\n{intro}"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+        return
+
+    # ถ้าไม่ใช่คำทักทาย → ประมวลผลเป็นคำขอแนะนำเพลง
     answer = generate_answer(user_message)
+    print("Gemini raw response:\n", answer)
 
-    # สร้าง Carousel Flex Message
     flex_msg = create_carousel_message(answer)
-
-    # ส่งกลับให้ผู้ใช้
     line_bot_api.reply_message(event.reply_token, flex_msg)
 
-# Webhook URL
+# Webhook
 @app.route("/callback", methods=['POST'])
 def callback():
     signature = request.headers['X-Line-Signature']
