@@ -1,6 +1,9 @@
 from google import genai
 from linebot import LineBotApi, WebhookHandler
-from linebot.models import TextSendMessage, MessageEvent, TextMessage
+from linebot.models import (
+    TextSendMessage, MessageEvent, TextMessage,
+    FlexSendMessage
+)
 from flask import Flask, request, abort
 
 # LINE API Access Token และ Channel Secret
@@ -21,27 +24,70 @@ app = Flask(__name__)
 def generate_answer(question):
     prompt = f"คุณคือผู้ให้คำแนะนำ เกี่ยวกับเพลง โดยค้นหาและแนะนำเพลง พร้อมลิ้งyoutubeด้วย ได้ทั้งไทยและสากล {question}"
     response = client.models.generate_content(
-        model="gemini-2.0-flash",  # เลือกโมเดลที่ต้องการ
-        contents=[prompt]  # ส่งคำถามที่มี prompt ไปยังโมเดล
+        model="gemini-2.0-flash",
+        contents=[prompt]
     )
     return response.text
+
+# ฟังก์ชันสร้าง Flex Message
+def create_flex_message(question, answer):
+    flex_content = {
+        "type": "bubble",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "🎧 คำแนะนำเพลง",
+                    "weight": "bold",
+                    "size": "lg",
+                    "color": "#1DB954"  # เขียวสไตล์ Spotify
+                }
+            ]
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "md",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": f"คำถาม:\n{question}",
+                    "wrap": True,
+                    "size": "sm",
+                    "color": "#888888"
+                },
+                {
+                    "type": "text",
+                    "text": f"คำตอบ:\n{answer}",
+                    "wrap": True,
+                    "size": "md",
+                    "color": "#000000"
+                }
+            ]
+        }
+    }
+    return FlexSendMessage(alt_text="แนะนำเพลง", contents=flex_content)
 
 # ฟังก์ชันจัดการข้อความที่ได้รับจากผู้ใช้
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     user_message = event.message.text
-    user_id = event.source.user_id  # ได้ User ID ของผู้ใช้
+    user_id = event.source.user_id
 
     print(f"Received message: {user_message} from {user_id}")
 
-    # ส่งข้อความที่ผู้ใช้ถามไปยัง Gemini API เพื่อขอคำตอบ
+    # ส่งข้อความไปยัง Gemini
     answer = generate_answer(user_message)
-    
-    # ส่งคำตอบกลับไปยังผู้ใช้ใน LINE
-    response_message = f"คำถาม: {user_message}\nคำตอบ: {answer}"
-    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=response_message))
 
-# Webhook URL สำหรับรับข้อความจาก LINE
+    # สร้าง Flex Message
+    flex_msg = create_flex_message(user_message, answer)
+
+    # ส่งกลับไปยัง LINE
+    line_bot_api.reply_message(event.reply_token, flex_msg)
+
+# Webhook URL
 @app.route("/callback", methods=['POST'])
 def callback():
     signature = request.headers['X-Line-Signature']
