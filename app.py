@@ -27,7 +27,7 @@ def generate_answer(question):
     prompt = (
         f"แนะนำเพลง 3 เพลง ที่เหมาะกับคำว่า: '{question}' "
         f"ให้ตอบกลับเป็น format ต่อไปนี้เท่านั้น (ห้ามเขียนอย่างอื่น):\n\n"
-        f"เพลง: <ชื่อเพลง>\nเหตุผล: <สั้นๆ 1-2 บรรทัด>\n\n"
+        f"เพลง: <ชื่อเพลง>\nเหตุผล: <สั้นๆ 1-2 บรรทัด>\nลิงก์: <ลิงก์ YouTube>\n\n"
         f"ทำแบบนี้ 3 ชุด ห้ามตอบเกิน และห้ามใส่ prefix หรือข้อความอื่นนอกจาก format นี้"
     )
     response = client.models.generate_content(
@@ -36,23 +36,20 @@ def generate_answer(question):
     )
     return response.text
 
-
-# ฟังก์ชันแปลงข้อมูลจาก Gemini ให้เป็นรายการเพลง
+# ฟังก์ชันแปลงข้อความจาก Gemini ให้เป็นรายการเพลง
 def parse_gemini_response(text):
     songs = []
     for block in text.strip().split("\n\n"):
         lines = block.strip().split("\n")
-        if len(lines) >= 2:
+        if len(lines) >= 3:
             title = lines[0].split("เพลง:")[1].strip()
             desc = lines[1].split("เหตุผล:")[1].strip()
-            # สร้างลิงก์ค้นหาบน YouTube
             query = title.replace(" ", "+")
             url = f"https://www.youtube.com/results?search_query={query}"
             songs.append({"title": title, "desc": desc, "url": url})
     return songs
 
-
-# ฟังก์ชันสร้าง Bubble สำหรับแต่ละเพลง
+# ฟังก์ชันสร้าง Bubble
 def build_song_bubble(song):
     return {
         "type": "bubble",
@@ -68,7 +65,7 @@ def build_song_bubble(song):
                     "weight": "bold",
                     "size": "lg",
                     "wrap": True,
-                    "color": "#1DB954"  # สีเขียวสไตล์ Spotify
+                    "color": "#1DB954"
                 },
                 {
                     "type": "text",
@@ -118,16 +115,7 @@ def handle_message(event):
 
     print(f"Received message: {user_message} from {user_id}")
 
-    # ส่งข้อความไปยัง Gemini เพื่อขอคำตอบ
-    answer = generate_answer(user_message)
-
-    # สร้าง Carousel Flex Message
-    flex_msg = create_carousel_message(answer)
-
-    # ส่งกลับให้ผู้ใช้
-    line_bot_api.reply_message(event.reply_token, flex_msg)
-
-# คำทักทายเบื้องต้น
+    # คำทักทายเบื้องต้น
     greetings = ['สวัสดี', 'hello', 'hi', 'หวัดดี', 'เฮลโหล', 'ไง']
     if any(greet in user_message for greet in greetings):
         hour = datetime.now().hour
@@ -159,7 +147,7 @@ def handle_message(event):
     flex_msg = create_carousel_message(answer)
     line_bot_api.reply_message(event.reply_token, flex_msg)
 
-# Webhook URL
+# Webhook
 @app.route("/callback", methods=['POST'])
 def callback():
     signature = request.headers['X-Line-Signature']
@@ -174,4 +162,4 @@ def callback():
     return 'OK'
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000)\
