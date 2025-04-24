@@ -7,6 +7,7 @@ from linebot.models import (
 from flask import Flask, request, abort
 from datetime import datetime
 import random
+import re
 
 # LINE API Access Token และ Channel Secret
 CHANNEL_ACCESS_TOKEN = 'Oz6x3Zse8dmKO5HWmiRy3aCa26v1aiRJWAFIcGXp/kvSE58NBWARFg1AUf0beFKgqj/+KavL0VJU6wtGOwc3Zf0UfgnAOLJnEBmUwExf6rbCBPz2wplzFtOUVDxo8HJ7RM7En2r4qYg9eBnQeeeWvQdB04t89/1O/w1cDnyilFU='
@@ -36,7 +37,15 @@ def generate_answer(question):
     )
     return response.text
 
+# แปลงลิงก์ให้เป็นแบบ youtu.be (เปิดผ่านแอปได้ง่ายกว่า)
+def convert_to_short_youtube_url(url):
+    match = re.search(r"v=([a-zA-Z0-9_-]+)", url)
+    if match:
+        video_id = match.group(1)
+        return f"https://youtu.be/{video_id}"
+    return url  # ถ้าไม่ใช่ลิงก์ YouTube ปกติ ให้คืนค่าตามเดิม
 # ฟังก์ชันแปลงข้อความจาก Gemini ให้เป็นรายการเพลง
+
 def parse_gemini_response(text):
     songs = []
     for block in text.strip().split("\n\n"):
@@ -44,7 +53,8 @@ def parse_gemini_response(text):
         if len(lines) >= 3:
             title = lines[0].split("เพลง:")[1].strip()
             desc = lines[1].split("เหตุผล:")[1].strip()
-            url = lines[2].split("ลิงก์:")[1].strip()
+            raw_url = lines[2].split("ลิงก์:")[1].strip()
+            url = convert_to_short_youtube_url(raw_url)
             songs.append({"title": title, "desc": desc, "url": url})
     return songs
 
