@@ -41,11 +41,11 @@ def parse_gemini_response(text):
     songs = []
     for block in text.strip().split("\n\n"):
         lines = block.strip().split("\n")
-        if len(lines) >= 2:
+        if len(lines) >= 3:
             title = lines[0].split("เพลง:")[1].strip()
             desc = lines[1].split("เหตุผล:")[1].strip()
             query = title.replace(" ", "+")
-            url = f"https://www.youtube.com/results?search_query={query}+เพลง"
+            url = f"https://www.youtube.com/results?search_query={query}"
             songs.append({"title": title, "desc": desc, "url": url})
     return songs
 
