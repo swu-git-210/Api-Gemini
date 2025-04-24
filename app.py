@@ -5,24 +5,22 @@ from linebot.models import (
     FlexSendMessage
 )
 from flask import Flask, request, abort
-from datetime import datetime
-import random
 
 # LINE API Access Token และ Channel Secret
 CHANNEL_ACCESS_TOKEN = 'Oz6x3Zse8dmKO5HWmiRy3aCa26v1aiRJWAFIcGXp/kvSE58NBWARFg1AUf0beFKgqj/+KavL0VJU6wtGOwc3Zf0UfgnAOLJnEBmUwExf6rbCBPz2wplzFtOUVDxo8HJ7RM7En2r4qYg9eBnQeeeWvQdB04t89/1O/w1cDnyilFU='
 CHANNEL_SECRET = 'c9810af033f3b71c3575127651aa3045'
 
-# Gemini API
+# สร้าง client สำหรับเชื่อมต่อกับ Gemini API
 client = genai.Client(api_key="AIzaSyDo2U64Wt4Kwcq7ei1U1TjeTkmmVaaYz1I")
 
-# LINE Bot
+# สร้าง LineBotApi และ WebhookHandler
 line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(CHANNEL_SECRET)
 
-# Flask app
+# สร้าง Flask app
 app = Flask(__name__)
 
-# เรียก Gemini
+# ฟังก์ชันหลักในการใช้ Gemini API
 def generate_answer(question):
     prompt = (
         f"แนะนำเพลง 3 เพลง ที่เหมาะกับคำว่า: '{question}' "
@@ -36,7 +34,8 @@ def generate_answer(question):
     )
     return response.text
 
-# แปลงข้อความ Gemini → list เพลง
+
+# ฟังก์ชันแปลงข้อมูลจาก Gemini ให้เป็นรายการเพลง
 def parse_gemini_response(text):
     songs = []
     for block in text.strip().split("\n\n"):
@@ -44,12 +43,14 @@ def parse_gemini_response(text):
         if len(lines) >= 2:
             title = lines[0].split("เพลง:")[1].strip()
             desc = lines[1].split("เหตุผล:")[1].strip()
+            # สร้างลิงก์ค้นหาบน YouTube
             query = title.replace(" ", "+")
             url = f"https://www.youtube.com/results?search_query={query}"
             songs.append({"title": title, "desc": desc, "url": url})
     return songs
 
-# สร้าง bubble card
+
+# ฟังก์ชันสร้าง Bubble สำหรับแต่ละเพลง
 def build_song_bubble(song):
     return {
         "type": "bubble",
@@ -65,7 +66,7 @@ def build_song_bubble(song):
                     "weight": "bold",
                     "size": "lg",
                     "wrap": True,
-                    "color": "#1DB954"
+                    "color": "#1DB954"  # สีเขียวสไตล์ Spotify
                 },
                 {
                     "type": "text",
@@ -94,23 +95,37 @@ def build_song_bubble(song):
         }
     }
 
-# สร้าง carousel จาก list เพลง
+# ฟังก์ชันสร้าง Carousel Message
 def create_carousel_message(answer_text):
     song_list = parse_gemini_response(answer_text)
     bubbles = [build_song_bubble(song) for song in song_list]
+
     return FlexSendMessage(
         alt_text="แนะนำเพลง",
-        contents={"type": "carousel", "contents": bubbles}
+        contents={
+            "type": "carousel",
+            "contents": bubbles
+        }
     )
 
-# รับข้อความจากผู้ใช้
+# ฟังก์ชันจัดการข้อความที่ได้รับจากผู้ใช้
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    user_message = event.message.text.lower()
+    user_message = event.message.text
     user_id = event.source.user_id
-    print(f"📨 Message from {user_id}: {user_message}")
 
-    # ตรวจว่าผู้ใช้ทักทายหรือไม่
+    print(f"Received message: {user_message} from {user_id}")
+
+    # ส่งข้อความไปยัง Gemini เพื่อขอคำตอบ
+    answer = generate_answer(user_message)
+
+    # สร้าง Carousel Flex Message
+    flex_msg = create_carousel_message(answer)
+
+    # ส่งกลับให้ผู้ใช้
+    line_bot_api.reply_message(event.reply_token, flex_msg)
+
+# คำทักทายเบื้องต้น
     greetings = ['สวัสดี', 'hello', 'hi', 'หวัดดี', 'เฮลโหล', 'ไง']
     if any(greet in user_message for greet in greetings):
         hour = datetime.now().hour
@@ -130,26 +145,30 @@ def handle_message(event):
             "อยากฟังเพลงแนวไหน บอกผมมาได้เลยครับ 🎼"
         ]
         intro = random.choice(intro_options)
+
         reply_text = f"{time_greeting}\n{intro}"
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
-    # ถ้าไม่ใช่คำทักทาย → ใช้ Gemini แนะนำเพลง
+    # ถ้าไม่ใช่คำทักทาย → ประมวลผลเป็นคำขอแนะนำเพลง
     answer = generate_answer(user_message)
-    print("🤖 Gemini response:\n", answer)
+    print("Gemini raw response:\n", answer)
+
     flex_msg = create_carousel_message(answer)
     line_bot_api.reply_message(event.reply_token, flex_msg)
 
-# Webhook
+# Webhook URL
 @app.route("/callback", methods=['POST'])
 def callback():
     signature = request.headers['X-Line-Signature']
     body = request.get_data(as_text=True)
+
     try:
         handler.handle(body, signature)
     except Exception as e:
-        print("❌ Error:", e)
+        print("Error:", e)
         abort(400)
+
     return 'OK'
 
 if __name__ == "__main__":
