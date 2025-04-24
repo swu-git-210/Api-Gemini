@@ -7,7 +7,6 @@ from linebot.models import (
 from flask import Flask, request, abort
 from datetime import datetime
 import random
-import requests
 
 # LINE API Access Token และ Channel Secret
 CHANNEL_ACCESS_TOKEN = 'Oz6x3Zse8dmKO5HWmiRy3aCa26v1aiRJWAFIcGXp/kvSE58NBWARFg1AUf0beFKgqj/+KavL0VJU6wtGOwc3Zf0UfgnAOLJnEBmUwExf6rbCBPz2wplzFtOUVDxo8HJ7RM7En2r4qYg9eBnQeeeWvQdB04t89/1O/w1cDnyilFU='
@@ -35,7 +34,7 @@ def generate_answer(question):
         model="gemini-2.0-flash",
         contents=[prompt]
     )
-    return response.candidates[0].content.parts[0].text
+    return response.text
 
 # ฟังก์ชันแปลงข้อความจาก Gemini ให้เป็นรายการเพลง
 def parse_gemini_response(text):
@@ -46,28 +45,8 @@ def parse_gemini_response(text):
             title = lines[0].split("เพลง:")[1].strip()
             desc = lines[1].split("เหตุผล:")[1].strip()
             url = lines[2].split("ลิงก์:")[1].strip()
-
-            # ตรวจสอบว่า URL ยังใช้ได้
-            try:
-                response = requests.head(url, allow_redirects=True, timeout=3)
-                if response.status_code == 200:
-                    # แปลง YouTube URL → youtube://video_id
-                    video_id = None
-                    if "watch?v=" in url:
-                        video_id = url.split("watch?v=")[-1].split("&")[0]
-                    elif "youtu.be/" in url:
-                        video_id = url.split("youtu.be/")[-1].split("?")[0]
-
-                    if video_id:
-                        app_url = f"youtube://{video_id}"
-                    else:
-                        app_url = url  # fallback ถ้าหา video_id ไม่เจอ
-
-                    songs.append({"title": title, "desc": desc, "url": app_url})
-            except Exception as e:
-                print(f"❌ ลิงก์เสีย: {url} → {e}")
+            songs.append({"title": title, "desc": desc, "url": url})
     return songs
-
 
 # ฟังก์ชันสร้าง Bubble
 def build_song_bubble(song):
