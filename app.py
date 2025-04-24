@@ -35,7 +35,7 @@ def generate_answer(question):
         model="gemini-2.0-flash",
         contents=[prompt]
     )
-    return response.text
+    return response.candidates[0].content.parts[0].text
 
 # ฟังก์ชันแปลงข้อความจาก Gemini ให้เป็นรายการเพลง
 def parse_gemini_response(text):
