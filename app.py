@@ -51,7 +51,19 @@ def parse_gemini_response(text):
             try:
                 response = requests.head(url, allow_redirects=True, timeout=3)
                 if response.status_code == 200:
-                    songs.append({"title": title, "desc": desc, "url": url})
+                    # แปลง YouTube URL → youtube://video_id
+                    video_id = None
+                    if "watch?v=" in url:
+                        video_id = url.split("watch?v=")[-1].split("&")[0]
+                    elif "youtu.be/" in url:
+                        video_id = url.split("youtu.be/")[-1].split("?")[0]
+
+                    if video_id:
+                        app_url = f"youtube://{video_id}"
+                    else:
+                        app_url = url  # fallback ถ้าหา video_id ไม่เจอ
+
+                    songs.append({"title": title, "desc": desc, "url": app_url})
             except Exception as e:
                 print(f"❌ ลิงก์เสีย: {url} → {e}")
     return songs
