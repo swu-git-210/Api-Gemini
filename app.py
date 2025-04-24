@@ -5,6 +5,8 @@ from linebot.models import (
     FlexSendMessage
 )
 from flask import Flask, request, abort
+from datetime import datetime
+import random
 
 # LINE API Access Token และ Channel Secret
 CHANNEL_ACCESS_TOKEN = 'Oz6x3Zse8dmKO5HWmiRy3aCa26v1aiRJWAFIcGXp/kvSE58NBWARFg1AUf0beFKgqj/+KavL0VJU6wtGOwc3Zf0UfgnAOLJnEBmUwExf6rbCBPz2wplzFtOUVDxo8HJ7RM7En2r4qYg9eBnQeeeWvQdB04t89/1O/w1cDnyilFU='
@@ -111,7 +113,7 @@ def create_carousel_message(answer_text):
 # ฟังก์ชันจัดการข้อความที่ได้รับจากผู้ใช้
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    user_message = event.message.text
+    user_message = event.message.text.lower()
     user_id = event.source.user_id
 
     print(f"Received message: {user_message} from {user_id}")
