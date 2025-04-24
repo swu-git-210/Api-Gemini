@@ -7,6 +7,7 @@ from linebot.models import (
 from flask import Flask, request, abort
 from datetime import datetime
 import random
+import requests
 
 # LINE API Access Token และ Channel Secret
 CHANNEL_ACCESS_TOKEN = 'Oz6x3Zse8dmKO5HWmiRy3aCa26v1aiRJWAFIcGXp/kvSE58NBWARFg1AUf0beFKgqj/+KavL0VJU6wtGOwc3Zf0UfgnAOLJnEBmUwExf6rbCBPz2wplzFtOUVDxo8HJ7RM7En2r4qYg9eBnQeeeWvQdB04t89/1O/w1cDnyilFU='
@@ -45,8 +46,16 @@ def parse_gemini_response(text):
             title = lines[0].split("เพลง:")[1].strip()
             desc = lines[1].split("เหตุผล:")[1].strip()
             url = lines[2].split("ลิงก์:")[1].strip()
-            songs.append({"title": title, "desc": desc, "url": url})
+
+            # ตรวจสอบว่า URL ยังใช้ได้
+            try:
+                response = requests.head(url, allow_redirects=True, timeout=3)
+                if response.status_code == 200:
+                    songs.append({"title": title, "desc": desc, "url": url})
+            except Exception as e:
+                print(f"❌ ลิงก์เสีย: {url} → {e}")
     return songs
+
 
 # ฟังก์ชันสร้าง Bubble
 def build_song_bubble(song):
