@@ -125,6 +125,38 @@ def handle_message(event):
     # ส่งกลับให้ผู้ใช้
     line_bot_api.reply_message(event.reply_token, flex_msg)
 
+# คำทักทายเบื้องต้น
+    greetings = ['สวัสดี', 'hello', 'hi', 'หวัดดี', 'เฮลโหล', 'ไง']
+    if any(greet in user_message for greet in greetings):
+        hour = datetime.now().hour
+        if 5 <= hour < 12:
+            time_greeting = "สวัสดีตอนเช้าครับ ☀️"
+        elif 12 <= hour < 17:
+            time_greeting = "สวัสดีตอนบ่ายครับ 🌤"
+        elif 17 <= hour < 21:
+            time_greeting = "สวัสดีตอนเย็นครับ 🌇"
+        else:
+            time_greeting = "สวัสดีตอนกลางคืนครับ 🌙"
+
+        intro_options = [
+            "ผมคือบอทแนะนำเพลง 🎧",
+            "ผมช่วยเลือกเพลงให้เหมาะกับอารมณ์ของคุณได้ครับ 🎶",
+            "พิมพ์ความรู้สึกของคุณมา แล้วผมจะหาเพลงให้เองครับ 😊",
+            "อยากฟังเพลงแนวไหน บอกผมมาได้เลยครับ 🎼"
+        ]
+        intro = random.choice(intro_options)
+
+        reply_text = f"{time_greeting}\n{intro}"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+        return
+
+    # ถ้าไม่ใช่คำทักทาย → ประมวลผลเป็นคำขอแนะนำเพลง
+    answer = generate_answer(user_message)
+    print("Gemini raw response:\n", answer)
+
+    flex_msg = create_carousel_message(answer)
+    line_bot_api.reply_message(event.reply_token, flex_msg)
+
 # Webhook URL
 @app.route("/callback", methods=['POST'])
 def callback():
