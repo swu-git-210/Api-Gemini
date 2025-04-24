@@ -36,18 +36,36 @@ def generate_answer(question):
     )
     return response.text
 
-# แปลงข้อความ Gemini → list เพลง
+# แปลงข้อความ Gemini → list เพลง (แบบ robust)
 def parse_gemini_response(text):
     songs = []
     for block in text.strip().split("\n\n"):
         lines = block.strip().split("\n")
-        if len(lines) >= 2:
-            title = lines[0].split("เพลง:")[1].strip()
-            desc = lines[1].split("เหตุผล:")[1].strip()
-            query = title.replace(" ", "+")
-            url = f"https://www.youtube.com/results?search_query={query}"
-            songs.append({"title": title, "desc": desc, "url": url})
+        if len(lines) >= 2 and "เพลง:" in lines[0] and "เหตุผล:" in lines[1]:
+            try:
+                title = lines[0].split("เพลง:")[1].strip()
+                desc = lines[1].split("เหตุผล:")[1].strip()
+                query = title.replace(" ", "+")
+                url = f"https://www.youtube.com/results?search_query={query}"
+                songs.append({"title": title, "desc": desc, "url": url})
+            except Exception as e:
+                print("❌ Parse error:", e)
+                continue
+        else:
+            print("⚠️ Block format not matched:", block)
     return songs
+
+# สร้าง carousel จาก list เพลง พร้อม fallback ถ้า Gemini ตอบผิด
+def create_carousel_message(answer_text):
+    song_list = parse_gemini_response(answer_text)
+    if not song_list:
+        return TextSendMessage(text="ขออภัยครับ ผมไม่สามารถแนะนำเพลงได้ในตอนนี้ ลองพิมพ์ใหม่อีกครั้งนะครับ 🎧")
+    
+    bubbles = [build_song_bubble(song) for song in song_list]
+    return FlexSendMessage(
+        alt_text="แนะนำเพลง",
+        contents={"type": "carousel", "contents": bubbles}
+    )
 
 # สร้าง bubble card
 def build_song_bubble(song):
