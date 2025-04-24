@@ -29,23 +29,24 @@ def generate_answer(question):
     )
     return response.text
 
-# ฟังก์ชันสร้าง Flex Message
-def create_flex_message(question, answer):
-    flex_content = {
+# ฟังก์ชันแปลงข้อมูลจาก Gemini ให้เป็นรายการเพลง
+def parse_gemini_response(text):
+    """ แปลงข้อความจาก Gemini เป็นรายการเพลงแบบ dict """
+    songs = []
+    for block in text.strip().split("\n\n"):
+        lines = block.strip().split("\n")
+        if len(lines) >= 3:
+            title = lines[0].split("เพลง:")[1].strip()
+            desc = lines[1].split("เหตุผล:")[1].strip()
+            url = lines[2].split("ลิงก์:")[1].strip()
+            songs.append({"title": title, "desc": desc, "url": url})
+    return songs
+
+# ฟังก์ชันสร้าง Bubble สำหรับแต่ละเพลง
+def build_song_bubble(song):
+    return {
         "type": "bubble",
-        "header": {
-            "type": "box",
-            "layout": "vertical",
-            "contents": [
-                {
-                    "type": "text",
-                    "text": "🎧 คำแนะนำเพลง",
-                    "weight": "bold",
-                    "size": "lg",
-                    "color": "#1DB954"  # เขียวสไตล์ Spotify
-                }
-            ]
-        },
+        "size": "kilo",
         "body": {
             "type": "box",
             "layout": "vertical",
@@ -53,22 +54,51 @@ def create_flex_message(question, answer):
             "contents": [
                 {
                     "type": "text",
-                    "text": f"คำถาม:\n{question}",
+                    "text": song["title"],
+                    "weight": "bold",
+                    "size": "lg",
                     "wrap": True,
-                    "size": "sm",
-                    "color": "#888888"
+                    "color": "#1DB954"  # สีเขียวสไตล์ Spotify
                 },
                 {
                     "type": "text",
-                    "text": f"คำตอบ:\n{answer}",
+                    "text": song["desc"],
                     "wrap": True,
-                    "size": "md",
-                    "color": "#000000"
+                    "size": "sm",
+                    "color": "#666666"
+                }
+            ]
+        },
+        "footer": {
+            "type": "box",
+            "layout": "horizontal",
+            "contents": [
+                {
+                    "type": "button",
+                    "style": "link",
+                    "height": "sm",
+                    "action": {
+                        "type": "uri",
+                        "label": "🔗 เปิดใน YouTube",
+                        "uri": song["url"]
+                    }
                 }
             ]
         }
     }
-    return FlexSendMessage(alt_text="แนะนำเพลง", contents=flex_content)
+
+# ฟังก์ชันสร้าง Carousel Message
+def create_carousel_message(answer_text):
+    song_list = parse_gemini_response(answer_text)
+    bubbles = [build_song_bubble(song) for song in song_list]
+
+    return FlexSendMessage(
+        alt_text="แนะนำเพลง",
+        contents={
+            "type": "carousel",
+            "contents": bubbles
+        }
+    )
 
 # ฟังก์ชันจัดการข้อความที่ได้รับจากผู้ใช้
 @handler.add(MessageEvent, message=TextMessage)
@@ -78,13 +108,13 @@ def handle_message(event):
 
     print(f"Received message: {user_message} from {user_id}")
 
-    # ส่งข้อความไปยัง Gemini
+    # ส่งข้อความไปยัง Gemini เพื่อขอคำตอบ
     answer = generate_answer(user_message)
 
-    # สร้าง Flex Message
-    flex_msg = create_flex_message(user_message, answer)
+    # สร้าง Carousel Flex Message
+    flex_msg = create_carousel_message(answer)
 
-    # ส่งกลับไปยัง LINE
+    # ส่งกลับให้ผู้ใช้
     line_bot_api.reply_message(event.reply_token, flex_msg)
 
 # Webhook URL
