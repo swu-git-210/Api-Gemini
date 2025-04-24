@@ -25,7 +25,7 @@ def generate_answer(question):
     prompt = (
         f"แนะนำเพลง 3 เพลง ที่เหมาะกับคำว่า: '{question}' "
         f"ให้ตอบกลับเป็น format ต่อไปนี้เท่านั้น (ห้ามเขียนอย่างอื่น):\n\n"
-        f"เพลง: <ชื่อเพลง>\nเหตุผล: <สั้นๆ 1-2 บรรทัด>\nลิงก์: <ลิงก์ YouTube>\n\n"
+        f"เพลง: <ชื่อเพลง>\nเหตุผล: <สั้นๆ 1-2 บรรทัด>\n\n"
         f"ทำแบบนี้ 3 ชุด ห้ามตอบเกิน และห้ามใส่ prefix หรือข้อความอื่นนอกจาก format นี้"
     )
     response = client.models.generate_content(
@@ -37,16 +37,18 @@ def generate_answer(question):
 
 # ฟังก์ชันแปลงข้อมูลจาก Gemini ให้เป็นรายการเพลง
 def parse_gemini_response(text):
-    """ แปลงข้อความจาก Gemini เป็นรายการเพลงแบบ dict """
     songs = []
     for block in text.strip().split("\n\n"):
         lines = block.strip().split("\n")
-        if len(lines) >= 3:
+        if len(lines) >= 2:
             title = lines[0].split("เพลง:")[1].strip()
             desc = lines[1].split("เหตุผล:")[1].strip()
-            url = lines[2].split("ลิงก์:")[1].strip()
+            # สร้างลิงก์ค้นหาบน YouTube
+            query = title.replace(" ", "+")
+            url = f"https://www.youtube.com/results?search_query={query}"
             songs.append({"title": title, "desc": desc, "url": url})
     return songs
+
 
 # ฟังก์ชันสร้าง Bubble สำหรับแต่ละเพลง
 def build_song_bubble(song):
