@@ -25,18 +25,18 @@ app = Flask(__name__)
 # ฟังก์ชันหลักในการใช้ Gemini API
 def generate_answer(question):
     prompt = (
-        f"แนะนำเพลง 3 เพลง ที่เหมาะกับคำว่า: '{question}' "
-        f"ให้ตอบกลับเป็น format ต่อไปนี้เท่านั้น (ห้ามเขียนอย่างอื่น):\n\n"
-        f"เพลง: <ชื่อเพลง>\nเหตุผล: <สั้นๆ 1-2 บรรทัด>\nลิงก์: <ลิงก์ YouTube>\n\n"
-        f"ทำแบบนี้ 3 ชุด ห้ามตอบเกิน และห้ามใส่ prefix หรือข้อความอื่นนอกจาก format นี้"
+        f"Please recommend 3 songs that match this feeling or keyword: '{question}' "
+        f"(You can answer in Thai or English as appropriate). Format your response like this ONLY:\n\n"
+        f"เพลง: <ชื่อเพลงหรือชื่อเพลงภาษาอังกฤษ>\nเหตุผล: <เหตุผลสั้นๆ>\nลิงก์: <ลิงก์ YouTube แบบตรง เช่น https://www.youtube.com/watch?v=...>\n\n"
+        f"Do this format exactly for 3 songs. Do not add any extra text or intro. Do not use YouTube search links."
     )
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.0-pro",  # ใช้ pro เพื่อคุณภาพดีขึ้น (หากบัญชีคุณรองรับ)
         contents=[prompt]
     )
     return response.text
 
-# ฟังก์ชันแปลงข้อความจาก Gemini ให้เป็นรายการเพลง
+# ปรับ parse ให้ใช้ลิงก์ที่ Gemini ให้มา (ไม่ต้อง gen เอง)
 def parse_gemini_response(text):
     songs = []
     for block in text.strip().split("\n\n"):
@@ -44,10 +44,12 @@ def parse_gemini_response(text):
         if len(lines) >= 3:
             title = lines[0].split("เพลง:")[1].strip()
             desc = lines[1].split("เหตุผล:")[1].strip()
-            query = title.replace(" ", "+")
-            url = f"https://www.youtube.com/results?search_query={query}"
+            url = lines[2].split("ลิงก์:")[1].strip()
             songs.append({"title": title, "desc": desc, "url": url})
     return songs
+
+# ส่วนอื่น ๆ เหมือนเดิม (build_song_bubble, create_carousel_message, handler, callback, etc.)
+
 
 # ฟังก์ชันสร้าง Bubble
 def build_song_bubble(song):
