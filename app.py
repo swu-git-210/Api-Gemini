@@ -42,12 +42,17 @@ def parse_gemini_response(text):
     for block in text.strip().split("\n\n"):
         lines = block.strip().split("\n")
         if len(lines) >= 3:
-            title = lines[0].split("เพลง:")[1].strip()
-            desc = lines[1].split("เหตุผล:")[1].strip()
-            query = title.replace(" ", "+")
-            url = f"https://www.youtube.com/results?search_query={query}"
-            songs.append({"title": title, "desc": desc, "url": url})
+            try:
+                title = lines[0].split("เพลง:")[1].strip()
+                desc = lines[1].split("เหตุผล:")[1].strip()
+                url = lines[2].split("ลิงก์:")[1].strip()
+                if "youtube.com" in url or "youtu.be" in url:
+                    songs.append({"title": title, "desc": desc, "url": url})
+            except Exception as e:
+                print("Parse error:", e)
+                continue
     return songs
+
 
 # ฟังก์ชันสร้าง Bubble
 def build_song_bubble(song):
